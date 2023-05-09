@@ -9,7 +9,7 @@ mpiexec -n 1 ./bruteforceNaive
 
 ## Tests
 ```
-gcc test1.c -o test -lssl -lcrypto
+gcc test.c -o test -lssl -lcrypto
 ./test
 ```
 ```
