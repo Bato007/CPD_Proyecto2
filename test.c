@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <openssl/des.h>
+#include <openssl/rand.h>
 
 void long_to_bytes(long input, unsigned char *output) {
     for (int i = 7; i >= 0; i--) {
@@ -20,7 +21,7 @@ void long_to_bytes(long input, unsigned char *output) {
 }
 
 //descifra un texto dado una llave
-void decrypt(long mykey, char *ciph, int len){
+void decrypt(long mykey, char *ciph, int len, unsigned char* iv){
   unsigned char key_bytes[8];
   long_to_bytes(mykey, key_bytes);
   DES_cblock key;
@@ -28,11 +29,15 @@ void decrypt(long mykey, char *ciph, int len){
   DES_key_schedule key_schedule;
   DES_set_key_unchecked(&key, &key_schedule);
 
-  DES_ecb_encrypt((const_DES_cblock*)ciph, (const_DES_cblock*)ciph, &key_schedule, DES_DECRYPT);
+
+    DES_cblock ivec;
+    memcpy(ivec, iv, sizeof(DES_cblock));
+
+  DES_ncbc_encrypt(ciph, ciph, len, &key_schedule, &ivec, DES_DECRYPT);
 }
 
 //cifra un texto dado una llave
-void encrypt(long mykey, char *ciph){
+void encrypt(long mykey, char *ciph, int len, unsigned char* iv){
   unsigned char key_bytes[8];
   long_to_bytes(mykey, key_bytes);
   DES_cblock key;
@@ -40,48 +45,42 @@ void encrypt(long mykey, char *ciph){
   DES_key_schedule key_schedule;
   DES_set_key_unchecked(&key, &key_schedule);
 
-  DES_ecb_encrypt((const_DES_cblock*)ciph, (const_DES_cblock*)ciph, &key_schedule, DES_ENCRYPT);
+
+    DES_cblock ivec;
+    memcpy(ivec, iv, sizeof(DES_cblock));
+
+  DES_ncbc_encrypt(ciph, ciph, len, &key_schedule, &ivec, DES_ENCRYPT);
 }
 
 //palabra clave a buscar en texto descifrado para determinar si se rompio el codigo
-char search[] = "una prueba de";
+char search[] = "hello";
 
 
-int tryKey(long mykey, char *ciph, int len){
-  unsigned char key_bytes[8] = {0};
-    for (int j = 0; j < 8; ++j)
-    {
-        key_bytes[j] = (mykey >> j) & 0x01;
-    }
+// int tryKey(long mykey, char *ciph, int len, unsigned char* iv){
+//   unsigned char key_bytes[8] = {0};
+//     for (int j = 0; j < 8; ++j)
+//     {
+//         key_bytes[j] = (mykey >> j) & 0xFF;
+//     }
 
-  DES_key_schedule key_schedule;
-  DES_set_key_unchecked((const_DES_cblock*)key_bytes, &key_schedule);
-
-
-    // Decrypt the padded message
-    unsigned char output[len];
-    for (size_t i = 0; i < len; i += 8)
-    {
-     DES_ecb_encrypt((const_DES_cblock*)(ciph + i), (const_DES_cblock*)(ciph + i), &key_schedule, DES_DECRYPT);
-    }
-
-        // Check if decrypted plaintext contains known substring
-        if (strstr((char *)ciph, search) != NULL)
-        {
-            // Print key and decrypted plaintext
-            printf("\nKey: ");
-            for (int k = 0; k < 8; ++k)
-            {
-                printf("%02x", key_bytes[k]);
-            }
-            printf("\n");
-        }
+//   DES_key_schedule key_schedule;
+//   DES_set_key_unchecked((const_DES_cblock*)key_bytes, &key_schedule);
 
 
-  return strstr((char *)ciph, search) != NULL;
-}
 
-unsigned char message[] = "Esta es una prueba de proyecto 2";
+//     DES_cblock ivec;
+//     memcpy(ivec, iv, sizeof(DES_cblock));
+
+//     // Decrypt the padded message
+//     unsigned char output[len];
+//   DES_ncbc_encrypt(ciph, output, len, &key_schedule, &ivec, DES_ENCRYPT);
+
+
+//             printf("\nDecrypted plaintext: %s\n", output);
+//   return strstr((char *)output, search) != NULL;
+// }
+
+unsigned char message[] = "esto es un texto mas largo hello";
 
 long the_key = 123456L;
 //2^56 / 4 es exactamente 18014398509481983
@@ -90,6 +89,15 @@ long the_key = 123456L;
 
 int main(int argc, char *argv[]){ //char **argv
   long found = 0L;
+  
+    unsigned char iv[8];
+    
+    // Generate a 8-byte IV
+    if (RAND_bytes(iv, 8) != 1)
+    {
+        printf("Error generating random bytes.\n");
+        return 1;
+    }
 
   // Pad the message with null bytes if it is not a multiple of 8 bytes
   size_t message_len = strlen(message);
@@ -98,7 +106,8 @@ int main(int argc, char *argv[]){ //char **argv
   memcpy(padded_message, message, message_len);
 
   // Encrypt the padded message
-  encrypt(the_key, padded_message);
+  encrypt(the_key, padded_message, padded_len, iv);
+  printf("encrypted output = %s\n\n", padded_message);
 
   
     // Print the encrypted ciphertext
@@ -109,16 +118,17 @@ int main(int argc, char *argv[]){ //char **argv
     }
 
 
+//   for(long i = 1; i<256; ++i){
+//     if(tryKey(i, padded_message, padded_len, iv)){
+//       found = i;
+//       printf("Process %d found the key\n", i);
+//       break;
+//     }
+//   }
 
-  for(long i = 1; i<256; ++i){
-    if(tryKey(i, padded_message, padded_len)){
-      found = i;
-      printf("Process %d found the key\n", i);
-      break;
-    }
-  }
 
-
-  printf("Key = %li\n\n", found);
+  printf("\nKey = %li\n\n", found);
+  printf("%s\n", padded_message);
+  decrypt(the_key, padded_message, padded_len, iv);
   printf("%s\n", padded_message);
 }
