@@ -13,6 +13,8 @@
 #include <openssl/des.h>
 #include <openssl/rand.h>
 
+#define KEY_SPACE_SIZE 4294967296 // 2^32 possible keys
+
 void long_to_bytes(long input, unsigned char *output) {
     for (int i = 7; i >= 0; i--) {
         output[i] = input & 0xFF;
@@ -56,29 +58,23 @@ void encrypt(long mykey, char *ciph, int len, unsigned char* iv){
 char search[] = "hello";
 
 
-// int tryKey(long mykey, char *ciph, int len, unsigned char* iv){
-//   unsigned char key_bytes[8] = {0};
-//     for (int j = 0; j < 8; ++j)
-//     {
-//         key_bytes[j] = (mykey >> j) & 0xFF;
-//     }
+int tryKey(long initial_guess, char *ciph, int len, unsigned char* iv){
+  for (long key_guess = initial_guess; key_guess < KEY_SPACE_SIZE; ++key_guess) {
+    unsigned char* decrypted = (unsigned char*)calloc(len, sizeof(unsigned char));
+    memcpy(decrypted, ciph, len);
 
-//   DES_key_schedule key_schedule;
-//   DES_set_key_unchecked((const_DES_cblock*)key_bytes, &key_schedule);
+    decrypt(key_guess, decrypted, len, iv);
+    // Check if the decrypted message contains the plaintext
+    if (strstr((char*)decrypted, search) != NULL) {
+        memcpy(ciph, decrypted, len);
+        return 1;
+    }
 
+    free(decrypted);
+  }
+  return 0;
 
-
-//     DES_cblock ivec;
-//     memcpy(ivec, iv, sizeof(DES_cblock));
-
-//     // Decrypt the padded message
-//     unsigned char output[len];
-//   DES_ncbc_encrypt(ciph, output, len, &key_schedule, &ivec, DES_ENCRYPT);
-
-
-//             printf("\nDecrypted plaintext: %s\n", output);
-//   return strstr((char *)output, search) != NULL;
-// }
+}
 
 unsigned char message[] = "esto es un texto mas largo hello";
 
@@ -118,17 +114,11 @@ int main(int argc, char *argv[]){ //char **argv
     }
 
 
-//   for(long i = 1; i<256; ++i){
-//     if(tryKey(i, padded_message, padded_len, iv)){
-//       found = i;
-//       printf("Process %d found the key\n", i);
-//       break;
-//     }
-//   }
+    // Decrypt the padded message
+    unsigned char* output = (unsigned char*)calloc(padded_len, sizeof(unsigned char));
+    memcpy(output, padded_message, padded_len);
 
-
-  printf("\nKey = %li\n\n", found);
-  printf("%s\n", padded_message);
-  decrypt(the_key, padded_message, padded_len, iv);
-  printf("%s\n", padded_message);
+    if (tryKey(found, output, padded_len, iv)) {
+      printf("\nOutput luego del trykey: %s\n", output);
+    }
 }
