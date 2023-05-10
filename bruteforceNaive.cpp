@@ -156,12 +156,12 @@ int main(int argc, char *argv[])
   string fileBody;
   size_t cypher_len, file_len;
 
-  MPI_Status status;
   MPI_Request request;
+  MPI_Status status;
   MPI_Comm comm = MPI_COMM_WORLD;
 
   //INIT MPI
-  MPI_Init(NULL, NULL);
+  MPI_Init(&argc, &argv);
   MPI_Comm_size(comm, &N);
   MPI_Comm_rank(comm, &id);
 
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
   myupper = range_per_node * (id + 1) - 1;
 
   if (id == N - 1) myupper = upper;
-  printf("Process [%d] lower = %ld upper = %ld\n", id, mylower, myupper);
+  printf("Process [%d] lower = %ld upper = %ld found = %ld\n", id, mylower, myupper, found);
 
   // Doesn't block and checks if the someone found the key
   MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &request);
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
     if (tryKey(i, cypher, cypher_len, iv))
     {
       found = i;
-      printf("Process %d found the key\n", id);
+      cout << "[" << id << "] Key found" << endl;
       for(int node = 0; node < N; node++) {
         MPI_Send(&found, 1, MPI_LONG, node, 0, comm);
       }
@@ -219,18 +219,18 @@ int main(int argc, char *argv[])
   }
   tend = MPI_Wtime();
 
-  // Waints for the rest of the
-  if (id==0)
+  if (id==0) // Waints for the rest
   {
     MPI_Wait(&request, &status);
-    printf("\nTook %f s to run\n", (tend-tstart));
     decrypt(found, cypher, cypher_len, iv);
-    printf("Key = %li\n\n", found);
-    printf("%s\n", cypher);
+
+    cout << endl << "[0] Took " << (tend - tstart) << " s to run" << endl;
+    cout << "[0] Key found = " << found << endl << endl;
+    printf("[0] %s\n", cypher);
   }
 
   // FInishing MPI
-  printf("Process %d exiting\n", id);
+  cout << "[" << id << "] Process exiting" << endl;
 
   MPI_Finalize();
   exit(0);
