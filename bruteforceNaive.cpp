@@ -1,6 +1,6 @@
 //>> mpic++ ./bruteforceNaive.cpp -lssl -lcrypto -o desBrute.exe
 //>> mpirun -np 2 desBrute.exe
-//>> mpirun --use-hwthread-cpus --oversubscribe -np 4 ./desBrute.exe
+//>> mpirun --use-hwthread-cpus --oversubscribe -np 4 ./desBrute.exe 120
 
 #include <string.h>
 #include <stdio.h>
@@ -33,8 +33,9 @@ using namespace std;
 //long the_key = 18014398509481983L;
 //long the_key = 18014398509481983L +1L;
 
+#define DEFAULT_KEY 123456L;
+
 char search[] = "there will be no";
-long the_key = 123456L;
 
 /**
  * Converts a long number to bytes
@@ -43,7 +44,8 @@ long the_key = 123456L;
 */
 void long_to_bytes(long input, unsigned char *output)
 {
-  for (int i = 7; i >= 0; i--) {
+  for (int i = 7; i >= 0; i--)
+  {
     output[i] = input & 0xFF;
     input >>= 8;
   }
@@ -89,16 +91,21 @@ void encrypt(long mykey, unsigned char *ciph)
 }
 
 /**
- * Test the key 
+ * Checks if the key is the correct one
+ * @param key_guess key that will be tested
+ * @param ciph cyphered text
+ * @param len cypher text size
+ * @param iv
 */
-int tryKey(long key_guess, unsigned char *ciph, int len, unsigned char *iv)
+int tryKey(long key_guess, unsigned char* ciph, int len, unsigned char* iv)
 {
   unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
   memcpy(decrypted, ciph, len);
   decrypt(key_guess, decrypted, len, iv);
 
   // Check if the decrypted message contains the plaintext
-  if (strstr((char *)decrypted, search) != NULL) {
+  if (strstr((char *)decrypted, search) != NULL)
+  {
     memcpy(ciph, decrypted, len);
     free(decrypted);
     return 1;
@@ -106,6 +113,23 @@ int tryKey(long key_guess, unsigned char *ciph, int len, unsigned char *iv)
 
   free(decrypted);
 	return 0;
+}
+
+/**
+ * Checks if a string is a valid integer
+ * @param str the string that will be tested
+ * @returns 1 if valid else 0
+*/
+int check_number(string str) {
+  for (int i = 0; i < str.length(); i++)
+  {
+    if (isdigit(str[i]) == 0)
+    {
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 /**
@@ -154,8 +178,8 @@ string getFileBody (string path)
 int main(int argc, char *argv[])
 {
   int N, id;
-  long upper = (1L << 56); //upper bound DES keys 2^56
-  long mylower, myupper;
+  long upper = (1L << 10); //upper bound DES keys 2^56
+  long mylower, myupper, key;
 	unsigned char iv[8];
 
   double tstart, tend;
@@ -207,11 +231,39 @@ int main(int argc, char *argv[])
     MPI_Recv(message, sizeof(unsigned char) * file_len, MPI_UNSIGNED_CHAR, 0, 0, comm, MPI_STATUS_IGNORE);
   }
 
+  // Gets the key from the params
+  if (argc > 1)
+  {
+    string temp_key = argv[1];
+    long temp; 
+
+
+    if (check_number(temp_key))
+    {
+      key = atol(temp_key.c_str());
+      if (id == 0) {
+        cout << "[0] Using custom key " << key << endl;
+      }
+    }
+    else
+    {
+      key = DEFAULT_KEY;
+      if (id == 0) {
+        cout << "[0] Error on input key, using default instead " << key << endl;
+      }
+    }
+  } else {
+    key = DEFAULT_KEY;
+    if (id == 0) {
+      cout << "[0] Using default key" << key << endl;
+    }
+  }
+
   // Starts encryption
   cypher_len = file_len + (8 - file_len % 8);
   cypher = (unsigned char*)calloc(cypher_len, sizeof(unsigned char));
   memcpy(cypher, message, file_len);
-  encrypt(the_key, cypher);
+  encrypt(key, cypher);
 
   // Distributes the work
   long range_per_node = upper / N;
@@ -226,21 +278,21 @@ int main(int argc, char *argv[])
 
   tstart = MPI_Wtime();
   if (found == -1) {
-    // for (long i = mylower; i < myupper; ++i)
-    // {
-    //   MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
-    //   if (ready) break;  // Key found by another proccess
+    for (long i = mylower; i < myupper; ++i)
+    {
+      MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
+      if (ready) break;  // Key found by another proccess
 
-    //   if (tryKey(i, cypher, cypher_len, iv))
-    //   {
-    //     found = i;
-    //     cout << "[" << id << "] Key found" << endl;
-    //     for(int node = 0; node < N; node++) {
-    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
-    //     }
-    //     break;
-    //   }
-    // }
+      // if (tryKey(i, cypher, cypher_len, iv))
+      // {
+      //   found = i;
+      //   cout << "[" << id << "] Key found" << endl;
+      //   for(int node = 0; node < N; node++) {
+      //     MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+      //   }
+      //   break;
+      // }
+    }
   }
   tend = MPI_Wtime();
 
