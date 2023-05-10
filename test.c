@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <openssl/des.h>
 #include <openssl/rand.h>
@@ -102,8 +103,14 @@ int main(int argc, char *argv[])
 	}
 
 	// Decrypt the padded message
+	double time_spent = 0.0;
+	clock_t initial, end;
+	initial = clock();
 	if (tryKey(found, padded_message, padded_len, iv))
 	{
 		printf("\nOutput luego del trykey: %s\n", padded_message);
 	}
+	end = clock();
+	time_spent += (double)(end - initial) / CLOCKS_PER_SEC;
+	printf("Time to find Key: %f", time_spent);
 }
