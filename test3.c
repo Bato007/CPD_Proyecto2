@@ -54,14 +54,13 @@ char search[] = "hello";
 
 int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
 {
-  long long left_guess = KEY_SPACE_SIZE / 2;
-  long long right_guess = (KEY_SPACE_SIZE / 2) + 1;
-	while (left_guess > 0 && right_guess < KEY_SPACE_SIZE)
-	{
+	long key_guess = initial_guess;
+	long long end_guess = KEY_SPACE_SIZE;
+	while (key_guess < end_guess) {
 		unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
 		memcpy(decrypted, ciph, len);
 
-		decrypt(left_guess, decrypted, len, iv);
+		decrypt(key_guess, decrypted, len, iv);
 		// Check if the decrypted message contains the plaintext
 		if (strstr((char *)decrypted, search) != NULL)
 		{
@@ -69,7 +68,7 @@ int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
 			return 1;
 		}
 
-		decrypt(right_guess, decrypted, len, iv);
+		decrypt(end_guess, decrypted, len, iv);
 		// Check if the decrypted message contains the plaintext
 		if (strstr((char *)decrypted, search) != NULL)
 		{
@@ -77,8 +76,8 @@ int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
 			return 1;
 		}
 
-    left_guess--;
-    right_guess++;
+		key_guess++;
+		end_guess--;
 
 		free(decrypted);
 	}
