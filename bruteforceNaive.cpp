@@ -113,32 +113,40 @@ int tryKey(long key_guess, unsigned char *ciph, int len, unsigned char *iv)
  * @param path location of the file to read
  * @returns the content of the file
 */
-string getFileBody (string path) {
+string getFileBody (string path)
+{
   int exists = 0;
   string data, aux;
   ifstream file(path);
 
-  if (file.fail()) {
+  // There was a problem reading the file
+  if (file.fail())
+  {
     cout << "[File] Error reading file " << path << endl;
     MPI_Finalize();
     exit(-1);
   }
 
-  while (getline(file, aux)) {
+  // Reads all the lines
+  while (getline(file, aux))
+  {
     data += aux;
     exists = 1;
-    if (file.peek() != EOF) {
+    if (file.peek() != EOF)
+    {
       data += "\n";
     }
   }
+  file.close();
 
-  if (exists == 0) {
+  // The file was empty
+  if (exists == 0)
+  {
     cout << "[File] Empety file encountered" << endl;
     MPI_Finalize();
     exit(-1);
   }
 
-  file.close();
   return data;
 }
 
@@ -160,26 +168,44 @@ int main(int argc, char *argv[])
   MPI_Status status;
   MPI_Comm comm = MPI_COMM_WORLD;
 
+  long found = -1L;
+  int ready = 0;
+
   //INIT MPI
   MPI_Init(&argc, &argv);
   MPI_Comm_size(comm, &N);
   MPI_Comm_rank(comm, &id);
 
-  
   // Sends the content of the file to the other proccesses
   if (id == 0)
   {
     fileBody = getFileBody("./data.txt");
     file_len = fileBody.size();
-  }
 
-  MPI_Bcast(&file_len, sizeof(size_t), MPI_SIZE_T, 0, MPI_COMM_WORLD);
+    for(int node = 0; node < N; node++)
+    {
+      MPI_Send(&file_len, 1, MPI_LONG, node, 0, comm);
+    }
+  }
+  else
+  {
+    MPI_Recv(&file_len, 1, MPI_LONG, 0, 0, comm, MPI_STATUS_IGNORE);
+  }
 
   unsigned char* message[file_len];
 
-  if (id == 0) strcpy((char*) message, fileBody.data());
-
-  MPI_Bcast(message, sizeof(unsigned char) * file_len, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+  if (id == 0)
+  {
+    strcpy((char*) message, fileBody.data());
+    for(int node = 0; node < N; node++)
+    {
+      MPI_Send(message, sizeof(unsigned char) * file_len, MPI_UNSIGNED_CHAR, node, 0, comm);
+    }
+  }
+  else
+  {
+    MPI_Recv(message, sizeof(unsigned char) * file_len, MPI_UNSIGNED_CHAR, 0, 0, comm, MPI_STATUS_IGNORE);
+  }
 
   // Starts encryption
   cypher_len = file_len + (8 - file_len % 8);
@@ -187,41 +213,40 @@ int main(int argc, char *argv[])
   memcpy(cypher, message, file_len);
   encrypt(the_key, cypher);
 
-  long found = 0L;
-  int ready = 0;
-
   // Distributes the work
   long range_per_node = upper / N;
   mylower = range_per_node * id;
   myupper = range_per_node * (id + 1) - 1;
 
   if (id == N - 1) myupper = upper;
-  printf("Process [%d] lower = %ld upper = %ld found = %ld\n", id, mylower, myupper, found);
+  printf("Process [%d] lower = %ld upper = %ld\n", id, mylower, myupper);
 
   // Doesn't block and checks if the someone found the key
-  MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &request);
+  MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, 1, comm, &request);
 
   tstart = MPI_Wtime();
-  for (long i = mylower; i < myupper; ++i)
-  {
-    MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
-    if (ready) break;  // Key found by another proccess
+  if (found == -1) {
+    // for (long i = mylower; i < myupper; ++i)
+    // {
+    //   MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
+    //   if (ready) break;  // Key found by another proccess
 
-    if (tryKey(i, cypher, cypher_len, iv))
-    {
-      found = i;
-      cout << "[" << id << "] Key found" << endl;
-      for(int node = 0; node < N; node++) {
-        MPI_Send(&found, 1, MPI_LONG, node, 0, comm);
-      }
-      break;
-    }
+    //   if (tryKey(i, cypher, cypher_len, iv))
+    //   {
+    //     found = i;
+    //     cout << "[" << id << "] Key found" << endl;
+    //     for(int node = 0; node < N; node++) {
+    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+    //     }
+    //     break;
+    //   }
+    // }
   }
   tend = MPI_Wtime();
 
-  if (id==0) // Waints for the rest
+  if (id == 0) // Waints for the rest
   {
-    MPI_Wait(&request, &status);
+    // MPI_Wait(&request, &status);
     decrypt(found, cypher, cypher_len, iv);
 
     cout << endl << "[0] Took " << (tend - tstart) << " s to run" << endl;
@@ -229,7 +254,7 @@ int main(int argc, char *argv[])
     printf("[0] %s\n", cypher);
   }
 
-  // FInishing MPI
+  // // FInishing MPI
   cout << "[" << id << "] Process exiting" << endl;
 
   MPI_Finalize();
