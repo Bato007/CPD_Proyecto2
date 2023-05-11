@@ -1,7 +1,3 @@
-//>> mpic++ ./bruteforceNaive.cpp -lssl -lcrypto -o desBrute.exe
-//>> mpirun -np 2 desBrute.exe
-//>> mpirun --use-hwthread-cpus --oversubscribe -np 4 ./desBrute.exe 120
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,25 +9,7 @@
 #include <stdint.h>
 #include <limits.h>
 
-#if SIZE_MAX == UCHAR_MAX
-  #define MPI_SIZE_T MPI_UNSIGNED_CHAR
-#elif SIZE_MAX == USHRT_MAX
-  #define MPI_SIZE_T MPI_UNSIGNED_SHORT
-#elif SIZE_MAX == UINT_MAX
-  #define MPI_SIZE_T MPI_UNSIGNED
-#elif SIZE_MAX == ULONG_MAX
-  #define MPI_SIZE_T MPI_UNSIGNED_LONG
-#elif SIZE_MAX == ULLONG_MAX
-  #define MPI_SIZE_T MPI_UNSIGNED_LONG_LONG
-#else
-  #error "what is happening here?"
-#endif
-
 using namespace std;
-
-//2^56 / 4 es exactamente 18014398509481983
-//long the_key = 18014398509481983L;
-//long the_key = 18014398509481983L +1L;
 
 #define DEFAULT_KEY 123456L;
 
@@ -56,9 +34,8 @@ void long_to_bytes(long input, unsigned char *output)
  * @param mykey key that will be used to desencrypt
  * @param ciph chypered text that will be decrypted (out)
  * @param len the size of the chyper
- * @param iv  
 */
-void decrypt(long mykey, unsigned char* ciph, int len, unsigned char* iv)
+void decrypt(long mykey, unsigned char* ciph, int len)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -67,18 +44,19 @@ void decrypt(long mykey, unsigned char* ciph, int len, unsigned char* iv)
 	DES_key_schedule key_schedule;
 	DES_set_key_unchecked(&key, &key_schedule);
 
-	DES_cblock ivec;
-	memcpy(ivec, iv, sizeof(DES_cblock));
-
-	DES_ncbc_encrypt(ciph, ciph, len, &key_schedule, &ivec, DES_DECRYPT);
+  for (size_t i = 0; i < len; i += 8)
+  {
+    DES_ecb_encrypt((const_DES_cblock*)(ciph + i), (const_DES_cblock*)(ciph + i), &key_schedule, DES_DECRYPT);
+  }
 }
 
 /**
  * Encrypts a text
  * @param mykey the key that will be used to encrypt
  * @param ciph plain text that will be encrypted
+ * @param ciph_len pthe lenght of the text
 */
-void encrypt(long mykey, unsigned char *ciph)
+void encrypt(long mykey, unsigned char *ciph, size_t ciph_len)
 {
   unsigned char key_bytes[8];
   long_to_bytes(mykey, key_bytes);
@@ -87,7 +65,10 @@ void encrypt(long mykey, unsigned char *ciph)
   DES_key_schedule key_schedule;
   DES_set_key_unchecked(&key, &key_schedule);
 
-  DES_ecb_encrypt((const_DES_cblock*)ciph, (const_DES_cblock*)ciph, &key_schedule, DES_ENCRYPT);
+  for (size_t i = 0; i < ciph_len; i += 8)
+  {
+    DES_ecb_encrypt((const_DES_cblock*)(ciph + i), (const_DES_cblock*)(ciph + i), &key_schedule, DES_ENCRYPT);
+  }
 }
 
 /**
@@ -95,13 +76,12 @@ void encrypt(long mykey, unsigned char *ciph)
  * @param key_guess key that will be tested
  * @param ciph cyphered text
  * @param len cypher text size
- * @param iv
 */
-int tryKey(long key_guess, unsigned char* ciph, int len, unsigned char* iv)
+int tryKey(long key_guess, unsigned char* ciph, int len)
 {
   unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
   memcpy(decrypted, ciph, len);
-  decrypt(key_guess, decrypted, len, iv);
+  decrypt(key_guess, decrypted, len);
 
   // Check if the decrypted message contains the plaintext
   if (strstr((char *)decrypted, search) != NULL)
@@ -178,9 +158,8 @@ string getFileBody (string path)
 int main(int argc, char *argv[])
 {
   int N, id;
-  long upper = (1L << 10); //upper bound DES keys 2^56
+  long upper = (1L << 56); //upper bound DES keys 2^56
   long mylower, myupper, key;
-	unsigned char iv[8];
 
   double tstart, tend;
 
@@ -263,7 +242,7 @@ int main(int argc, char *argv[])
   cypher_len = file_len + (8 - file_len % 8);
   cypher = (unsigned char*)calloc(cypher_len, sizeof(unsigned char));
   memcpy(cypher, message, file_len);
-  encrypt(key, cypher);
+  encrypt(key, cypher, cypher_len);
 
   // Distributes the work
   long range_per_node = upper / N;
@@ -283,27 +262,34 @@ int main(int argc, char *argv[])
       MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
       if (ready) break;  // Key found by another proccess
 
-      // if (tryKey(i, cypher, cypher_len, iv))
-      // {
-      //   found = i;
-      //   cout << "[" << id << "] Key found" << endl;
-      //   for(int node = 0; node < N; node++) {
-      //     MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
-      //   }
-      //   break;
-      // }
+      if (tryKey(i, cypher, cypher_len))
+      {
+        found = i;
+        cout << "[" << id << "] Key found" << endl;
+        for(int node = 0; node < N; node++) {
+          MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+        }
+        break;
+      }
     }
   }
   tend = MPI_Wtime();
 
   if (id == 0) // Waints for the rest
   {
-    // MPI_Wait(&request, &status);
-    decrypt(found, cypher, cypher_len, iv);
+    MPI_Wait(&request, &status);
 
     cout << endl << "[0] Took " << (tend - tstart) << " s to run" << endl;
     cout << "[0] Key found = " << found << endl << endl;
-    printf("[0] %s\n", cypher);
+
+    memcpy(cypher, message, file_len);
+    encrypt(key, cypher, cypher_len);
+    printf("[0] Encrypted text: %s\n", cypher);
+
+    
+
+    decrypt(found, cypher, cypher_len);
+    printf("[0] Dencrypted text: %s\n", cypher);
   }
 
   // // FInishing MPI
