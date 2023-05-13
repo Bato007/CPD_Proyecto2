@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
 
   tstart = MPI_Wtime();
   if (found == -1) {
+    // Approach 1
     for (long i = mylower; i < myupper; ++i)
     {
       MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
@@ -272,6 +273,59 @@ int main(int argc, char *argv[])
         break;
       }
     }
+    // Approach 2
+    // for (long i = mylower; i < myupper / 2; ++i) {
+    //   MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
+    //   if (ready) break;  // Key found by another proccess
+    //   long j = myupper - i;
+    //   if (tryKey(i, cypher, cypher_len))
+    //   {
+    //     found = i;
+    //     cout << "[" << id << "] Key found" << endl;
+    //     for(int node = 0; node < N; node++) {
+    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+    //     }
+    //     break;
+    //   }
+    //   if (tryKey(j, cypher, cypher_len))
+    //   {
+    //     found = j;
+    //     cout << "[" << id << "] Key found" << endl;
+    //     for(int node = 0; node < N; node++) {
+    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+    //     }
+    //     break;
+    //   }
+    // }
+    // Approach 3
+    // long localLower = (myupper - mylower) / 2;
+    // long localUpper = localLower + 4;
+    // while(localLower > mylower && localUpper < myupper) {
+    //   MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
+    //   if (ready) break;  // Key found by another proccess
+    //   if (tryKey(localLower, cypher, cypher_len))
+    //   {
+    //     found = localLower;
+    //     cout << "[" << id << "] Key found" << endl;
+    //     for(int node = 0; node < N; node++) {
+    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+    //     }
+    //     break;
+    //   }
+    //   if (tryKey(localUpper, cypher, cypher_len))
+    //   {
+    //     found = localUpper;
+    //     cout << "[" << id << "] Key found" << endl;
+    //     for(int node = 0; node < N; node++) {
+    //       MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+    //     }
+    //     break;
+    //   }
+
+    //   localLower--;
+    //   localUpper++;
+
+    // }
   }
   tend = MPI_Wtime();
 
