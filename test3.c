@@ -8,7 +8,7 @@
 
 #define KEY_SPACE_SIZE 4294967296 // 2^32 possible keys
 
-void long_to_bytes(long input, unsigned char *output)
+void long_to_bytes(long long input, unsigned char *output)
 {
 	for (int i = 7; i >= 0; i--)
 	{
@@ -18,7 +18,7 @@ void long_to_bytes(long input, unsigned char *output)
 }
 
 // descifra un texto dado una llave
-void decrypt(long mykey, char *ciph, int len, unsigned char *iv)
+void decrypt(long long mykey, char *ciph, int len, unsigned char *iv)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -34,7 +34,7 @@ void decrypt(long mykey, char *ciph, int len, unsigned char *iv)
 }
 
 // cifra un texto dado una llave
-void encrypt(long mykey, char *ciph, int len, unsigned char *iv)
+void encrypt(long long mykey, char *ciph, int len, unsigned char *iv)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -52,11 +52,11 @@ void encrypt(long mykey, char *ciph, int len, unsigned char *iv)
 // palabra clave a buscar en texto descifrado para determinar si se rompio el codigo
 char search[] = "hello";
 
-int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
+int tryKey(long long initial_guess, char *ciph, int len, unsigned char *iv)
 {
-	long key_guess = initial_guess;
+	long long key_guess = initial_guess;
 	long long end_guess = KEY_SPACE_SIZE;
-	while (key_guess < end_guess) {
+	while (key_guess <= end_guess) {
 		unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
 		memcpy(decrypted, ciph, len);
 
@@ -85,11 +85,11 @@ int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
 }
 
 unsigned char message[] = "esto es un texto mas largo hello";
-long the_key = 123456L;
+long long the_key = 8014398509481983L;
 
 int main(int argc, char *argv[])
 {
-	long found = 0L;
+	long long found = 0L;
 	unsigned char iv[8];
 
 	// Generate a 8-byte IV
@@ -124,5 +124,5 @@ int main(int argc, char *argv[])
 	}
 	end = clock();
 	time_spent += (double)(end - initial) / CLOCKS_PER_SEC;
-	printf("Time to find Key: %f", time_spent);
+	printf("\nTime to find Key: %f", time_spent);
 }
