@@ -1,10 +1,13 @@
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string>
+#include <fstream>
 #include <unistd.h>
 #include <openssl/des.h>
 #include <openssl/rand.h>
+
+using namespace std;
 
 #define KEY_SPACE_SIZE 4294967296 // 2^32 possible keys
 
@@ -54,44 +57,86 @@ char search[] = "es una prueba de";
 
 int tryKey(long long initial_guess, char *ciph, int len, unsigned char *iv)
 {
-  long long left_guess = KEY_SPACE_SIZE / 2;
-  long long right_guess = (KEY_SPACE_SIZE / 2) + 1;
-	while (left_guess >= 0 && right_guess <= KEY_SPACE_SIZE)
+	for (long long key_guess = initial_guess; key_guess < KEY_SPACE_SIZE; ++key_guess)
 	{
 		unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
 		memcpy(decrypted, ciph, len);
 
-		decrypt(left_guess, decrypted, len, iv);
+		decrypt(key_guess, decrypted, len, iv);
 		// Check if the decrypted message contains the plaintext
 		if (strstr((char *)decrypted, search) != NULL)
 		{
 			memcpy(ciph, decrypted, len);
 			return 1;
 		}
-
-		decrypt(right_guess, decrypted, len, iv);
-		// Check if the decrypted message contains the plaintext
-		if (strstr((char *)decrypted, search) != NULL)
-		{
-			memcpy(ciph, decrypted, len);
-			return 1;
-		}
-
-    left_guess--;
-    right_guess++;
 
 		free(decrypted);
 	}
 	return 0;
 }
 
-unsigned char message[] = "Esta es una prueba de proyecto 2";
-long long the_key = 8014398509481984L;
+/**
+ * Checks if a string is a valid integer
+ * @param str the string that will be tested
+ * @returns 1 if valid else 0
+*/
+int check_number(string str) {
+  for (int i = 0; i < str.length(); i++)
+  {
+    if (isdigit(str[i]) == 0)
+    {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+string getFileBody (string path)
+{
+	int exists = 0;
+	string data, aux;
+	ifstream file(path);
+	data = "";
+
+	// Problem reading file
+	if (file.fail())
+	{
+		printf("[File] Error reading file %s", path);
+		exit(-1);
+	}
+
+	// Reading line by line
+	while (getline(file, aux))
+	{
+		data += aux;
+		exists = 1;
+		if (file.peek() != EOF)
+		{
+			data += '\n';
+		}
+	}
+	file.close();
+
+	// File is empty
+	if (!exists)
+	{
+		printf("[File] Empty file");
+		exit(-1);
+	}
+
+	return data;
+	
+}
+
+long long the_key = 123456L;
 
 int main(int argc, char *argv[])
 {
-	long long found = 0L;
+	long found = 0L;
 	unsigned char iv[8];
+	string fileBody;
+	fileBody = getFileBody("./data.txt");
 
 	// Generate a 8-byte IV
 	if (RAND_bytes(iv, 8) != 1)
@@ -100,11 +145,27 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (argc > 1) {
+		string tempKey = argv[1];
+		long temp;
+		if (check_number(tempKey))
+		{
+			the_key = atoll(tempKey.c_str());
+		}
+		else
+		{
+			printf("[Input] Error on input key, using default instead\n");
+		}
+	}
+	else{
+		printf("[Input] No input provided, using default key instead\n");
+	}
+
 	// Pad the message with null bytes if it is not a multiple of 8 bytes
-	size_t message_len = strlen(message);
+	size_t message_len = fileBody.size();
 	size_t padded_len = message_len + (8 - message_len % 8);
 	unsigned char *padded_message = (unsigned char *)calloc(padded_len, sizeof(unsigned char));
-	memcpy(padded_message, message, message_len);
+	memcpy(padded_message, fileBody.c_str(), message_len);
 
 	// Encrypt the padded message
 	encrypt(the_key, padded_message, padded_len, iv);
@@ -125,5 +186,5 @@ int main(int argc, char *argv[])
 	}
 	end = clock();
 	time_spent += (double)(end - initial) / CLOCKS_PER_SEC;
-	printf("\nTime to find Key: %f", time_spent);
+	printf("Time to find Key: %f", time_spent);
 }

@@ -15,14 +15,14 @@
 
 ## Secuenciales
 ```
-  gcc seq.c -o seq -lssl -lcrypto
-  ./seq
+  g++ seq.cpp -o seq -lssl -lcrypto -fpermissive
+  ./seq | ./seq `key`
 ```
 ```
-  gcc seq2.c -o seq -lssl -lcrypto
-  ./seq
+  g++ seq2.cpp -o seq -lssl -lcrypto -fpermissive
+  ./seq | ./seq `key`
 ```
 ```
-  gcc seq3.c -o seq -lssl -lcrypto
-  ./seq
+  g++ seq3.cpp -o seq -lssl -lcrypto -fpermissive
+  ./seq | ./seq `key`
 ```
