@@ -7,12 +7,16 @@
   mpirun --use-hwthread-cpus --oversubscribe -np 4 ./desBrute.exe 120
 ```
 
-## Tests
+## Secuenciales
 ```
-  gcc test.c -o test -lssl -lcrypto
-  ./test
+  gcc seq.c -o seq -lssl -lcrypto
+  ./seq
 ```
 ```
-  gcc test2.c -o test -lssl -lcrypto
-  ./test
+  gcc seq2.c -o seq -lssl -lcrypto
+  ./seq
+```
+```
+  gcc seq3.c -o seq -lssl -lcrypto
+  ./seq
 ```

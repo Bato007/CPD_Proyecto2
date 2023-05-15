@@ -8,7 +8,7 @@
 
 #define KEY_SPACE_SIZE 4294967296 // 2^32 possible keys
 
-void long_to_bytes(long input, unsigned char *output)
+void long_to_bytes(long long input, unsigned char *output)
 {
 	for (int i = 7; i >= 0; i--)
 	{
@@ -18,7 +18,7 @@ void long_to_bytes(long input, unsigned char *output)
 }
 
 // descifra un texto dado una llave
-void decrypt(long mykey, char *ciph, int len, unsigned char *iv)
+void decrypt(long long mykey, char *ciph, int len, unsigned char *iv)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -34,7 +34,7 @@ void decrypt(long mykey, char *ciph, int len, unsigned char *iv)
 }
 
 // cifra un texto dado una llave
-void encrypt(long mykey, char *ciph, int len, unsigned char *iv)
+void encrypt(long long mykey, char *ciph, int len, unsigned char *iv)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -50,16 +50,18 @@ void encrypt(long mykey, char *ciph, int len, unsigned char *iv)
 }
 
 // palabra clave a buscar en texto descifrado para determinar si se rompio el codigo
-char search[] = "hello";
+char search[] = "es una prueba de";
 
-int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
+int tryKey(long long initial_guess, char *ciph, int len, unsigned char *iv)
 {
-	for (long key_guess = initial_guess; key_guess < KEY_SPACE_SIZE; ++key_guess)
+  long long left_guess = KEY_SPACE_SIZE / 2;
+  long long right_guess = (KEY_SPACE_SIZE / 2) + 1;
+	while (left_guess >= 0 && right_guess <= KEY_SPACE_SIZE)
 	{
 		unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
 		memcpy(decrypted, ciph, len);
 
-		decrypt(key_guess, decrypted, len, iv);
+		decrypt(left_guess, decrypted, len, iv);
 		// Check if the decrypted message contains the plaintext
 		if (strstr((char *)decrypted, search) != NULL)
 		{
@@ -67,17 +69,28 @@ int tryKey(long initial_guess, char *ciph, int len, unsigned char *iv)
 			return 1;
 		}
 
+		decrypt(right_guess, decrypted, len, iv);
+		// Check if the decrypted message contains the plaintext
+		if (strstr((char *)decrypted, search) != NULL)
+		{
+			memcpy(ciph, decrypted, len);
+			return 1;
+		}
+
+    left_guess--;
+    right_guess++;
+
 		free(decrypted);
 	}
 	return 0;
 }
 
-unsigned char message[] = "esto es un texto mas largo hello";
-long the_key = 123456L;
+unsigned char message[] = "Esta es una prueba de proyecto 2";
+long long the_key = 8014398509481984L;
 
 int main(int argc, char *argv[])
 {
-	long found = 0L;
+	long long found = 0L;
 	unsigned char iv[8];
 
 	// Generate a 8-byte IV
@@ -112,5 +125,5 @@ int main(int argc, char *argv[])
 	}
 	end = clock();
 	time_spent += (double)(end - initial) / CLOCKS_PER_SEC;
-	printf("Time to find Key: %f", time_spent);
+	printf("\nTime to find Key: %f", time_spent);
 }

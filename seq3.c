@@ -50,7 +50,7 @@ void encrypt(long long mykey, char *ciph, int len, unsigned char *iv)
 }
 
 // palabra clave a buscar en texto descifrado para determinar si se rompio el codigo
-char search[] = "hello";
+char search[] = "es una prueba de";
 
 int tryKey(long long initial_guess, char *ciph, int len, unsigned char *iv)
 {
@@ -84,8 +84,8 @@ int tryKey(long long initial_guess, char *ciph, int len, unsigned char *iv)
 	return 0;
 }
 
-unsigned char message[] = "esto es un texto mas largo hello";
-long long the_key = 8014398509481983L;
+unsigned char message[] = "Esta es una prueba de proyecto 2";
+long long the_key = 8014398509481984L;
 
 int main(int argc, char *argv[])
 {
