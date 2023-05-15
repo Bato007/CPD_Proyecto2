@@ -159,7 +159,6 @@ int main(int argc, char *argv[])
 
 	if (argc > 1) {
 		string tempKey = argv[1];
-		long temp;
 		if (check_number(tempKey))
 		{
 			the_key = atoll(tempKey.c_str());
