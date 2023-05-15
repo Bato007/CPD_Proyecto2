@@ -11,7 +11,7 @@
 
 using namespace std;
 
-#define DEFAULT_KEY 123456L;
+#define DEFAULT_KEY 8014398509481983LL;
 
 char search[] = "es una prueba de";
 
@@ -20,7 +20,7 @@ char search[] = "es una prueba de";
  * @param input the long number that will be converted
  * @param output the long number transformed to bytes
 */
-void long_to_bytes(long input, unsigned char *output)
+void long_to_bytes(long long input, unsigned char *output)
 {
   for (int i = 7; i >= 0; i--)
   {
@@ -35,7 +35,7 @@ void long_to_bytes(long input, unsigned char *output)
  * @param ciph chypered text that will be decrypted (out)
  * @param len the size of the chyper
 */
-void decrypt(long mykey, unsigned char* ciph, int len)
+void decrypt(long long mykey, unsigned char* ciph, int len)
 {
 	unsigned char key_bytes[8];
 	long_to_bytes(mykey, key_bytes);
@@ -56,7 +56,7 @@ void decrypt(long mykey, unsigned char* ciph, int len)
  * @param ciph plain text that will be encrypted
  * @param ciph_len pthe lenght of the text
 */
-void encrypt(long mykey, unsigned char *ciph, size_t ciph_len)
+void encrypt(long long mykey, unsigned char *ciph, size_t ciph_len)
 {
   unsigned char key_bytes[8];
   long_to_bytes(mykey, key_bytes);
@@ -77,7 +77,7 @@ void encrypt(long mykey, unsigned char *ciph, size_t ciph_len)
  * @param ciph cyphered text
  * @param len cypher text size
 */
-int tryKey(long key_guess, unsigned char* ciph, int len)
+int tryKey(long long key_guess, unsigned char* ciph, int len)
 {
   unsigned char *decrypted = (unsigned char *)calloc(len, sizeof(unsigned char));
   memcpy(decrypted, ciph, len);
@@ -158,8 +158,8 @@ string getFileBody (string path)
 int main(int argc, char *argv[])
 {
   int N, id;
-  long upper = (1L << 56); //upper bound DES keys 2^56
-  long mylower, myupper, key;
+  long long upper = (1LL << 56); //upper bound DES keys 2^56
+  long long mylower, myupper, key;
 
   double tstart, tend;
 
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
   MPI_Status status;
   MPI_Comm comm = MPI_COMM_WORLD;
 
-  long found = -1L;
+  long long found = -1L;
   int ready = 0;
 
   //INIT MPI
@@ -185,14 +185,14 @@ int main(int argc, char *argv[])
     fileBody = getFileBody("./data.txt");
     file_len = fileBody.size();
 
-    for(int node = 0; node < N; node++)
+    for(int node = 1; node < N; node++)
     {
-      MPI_Send(&file_len, 1, MPI_LONG, node, 0, comm);
+      MPI_Send(&file_len, 1, MPI_LONG_LONG, node, 0, comm);
     }
   }
   else
   {
-    MPI_Recv(&file_len, 1, MPI_LONG, 0, 0, comm, MPI_STATUS_IGNORE);
+    MPI_Recv(&file_len, 1, MPI_LONG_LONG, 0, 0, comm, MPI_STATUS_IGNORE);
   }
 
   unsigned char* message[file_len];
@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
   if (id == 0)
   {
     strcpy((char*) message, fileBody.data());
-    for(int node = 0; node < N; node++)
+    for(int node = 1; node < N; node++)
     {
       MPI_Send(message, sizeof(unsigned char) * file_len, MPI_UNSIGNED_CHAR, node, 0, comm);
     }
@@ -214,8 +214,6 @@ int main(int argc, char *argv[])
   if (argc > 1)
   {
     string temp_key = argv[1];
-    long temp; 
-
 
     if (check_number(temp_key))
     {
@@ -245,47 +243,46 @@ int main(int argc, char *argv[])
   encrypt(key, cypher, cypher_len);
 
   // Distributes the work
-  long range_per_node = upper / N;
+  long long range_per_node = upper / N;
   mylower = range_per_node * id;
   myupper = range_per_node * (id + 1) - 1;
 
   if (id == N - 1) myupper = upper;
-  printf("Process [%d] lower = %ld upper = %ld\n", id, mylower, myupper);
+  printf("Process [%d] lower = %llu upper = %llu\n", id, mylower, myupper);
 
   // Doesn't block and checks if the someone found the key
-  MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, 1, comm, &request);
+  MPI_Irecv(&found, 1, MPI_LONG_LONG, MPI_ANY_SOURCE, 1, comm, &request);
 
   tstart = MPI_Wtime();
   if (found == -1) {
     // Approach 3
-    long localLower = (myupper - mylower) / 2;
-    long localUpper = localLower + 4;
-    while(localLower > mylower && localUpper < myupper) {
+    long long localLower = mylower;
+    long long localUpper = myupper;
+    for (long long i=mylower; i<myupper; ++i) {
+      long long j = myupper - i;
+
       MPI_Test(&request, &ready, MPI_STATUS_IGNORE);
       if (ready) break;  // Key found by another proccess
 
-      if (tryKey(localLower, cypher, cypher_len))
+      if (tryKey(i, cypher, cypher_len))
       {
-        found = localLower;
+        found = i;
         cout << "[" << id << "] Key found" << endl;
         for(int node = 0; node < N; node++) {
-          MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+          MPI_Send(&found, 1, MPI_LONG_LONG, node, 1, comm);
         }
         break;
       }
 
-      if (tryKey(localUpper, cypher, cypher_len))
+      if (tryKey(j, cypher, cypher_len))
       {
-        found = localUpper;
+        found = j;
         cout << "[" << id << "] Key found" << endl;
         for(int node = 0; node < N; node++) {
-          MPI_Send(&found, 1, MPI_LONG, node, 1, comm);
+          MPI_Send(&found, 1, MPI_LONG_LONG, node, 1, comm);
         }
         break;
       }
-
-      localLower--;
-      localUpper++;
     }
   }
   tend = MPI_Wtime();
