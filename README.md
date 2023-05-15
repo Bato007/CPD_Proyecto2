@@ -4,13 +4,12 @@
 
 ```
   mpic++ ./brute1.cpp -lssl -lcrypto -o brute1.exe
-  mpirun --use-hwthread-cpus --oversubscribe -np 4 ./brute1.exe
-
-  mpic++ ./brute2.cpp -lssl -lcrypto -o brute2.exe
-  mpirun --use-hwthread-cpus --oversubscribe -np 4 ./brute2.exe
-
-  mpic++ ./brute3.cpp -lssl -lcrypto -o brute3.exe
-  mpirun --use-hwthread-cpus --oversubscribe -np 4 ./brute3.exe
+  mpirun --use-hwthread-cpus --oversubscribe -np 4 ./brute1.exe 120
+```
+or
+```
+mpic++ -static-libgcc -static-libstdc++ -lmingwex ./brute1.cpp -lssl -lcrypto -o brute1.exe
+mpiexec -n 4 ./brute1.exe 120
 ```
 
 ## Secuenciales
