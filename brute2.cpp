@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 
     if (check_number(temp_key))
     {
-      key = atol(temp_key.c_str());
+      key = atoll(temp_key.c_str());
       if (id == 0) {
         cout << "[0] Using custom key " << key << endl;
       }
